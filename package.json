@@ -1,0 +1,12 @@
+{
+  "name": "science-lab",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Interactive biology, physics and chemistry workspace",
+  "scripts": {
+    "start": "python3 -m http.server 8899",
+    "test": "node tests/run-tests.mjs",
+    "test:browser": "node tests/layout.mjs"
+  }
+}
