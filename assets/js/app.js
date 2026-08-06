@@ -4,6 +4,7 @@
  */
 
 import { h, clear, note } from "./lib/ui.js";
+import { disposeAllStages } from "./lib/three-stage.js";
 import physics from "./modules/physics.js";
 import chemistry from "./modules/chemistry.js";
 import biology from "./modules/biology.js";
@@ -103,6 +104,8 @@ function renderRail() {
 }
 
 function renderStage() {
+  // 3D tools hold WebGL contexts; release them before the view is torn down.
+  disposeAllStages();
   clear(stage);
   const { subject, tool } = current;
   document.documentElement.style.setProperty("--accent", subject.accent);

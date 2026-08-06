@@ -10,6 +10,7 @@ import {
 import { ELEMENTS, CATEGORIES, BY_SYMBOL, electronConfiguration, shellOccupancy, gridPosition } from "../data/elements.js";
 import { CONSTANTS, FORMULA_SHEETS } from "../data/reference.js";
 import { molarMass, composition, balanceEquation, atomTally, empiricalFormula, formatFormula } from "../lib/chemistry-core.js";
+import { CHEM3D_TOOLS } from "./chem3d.js";
 
 const ACCENT = "var(--chem)";
 const R = 8.314462618;
@@ -661,11 +662,12 @@ export default {
   hero: {
     title: "Chemistry workspace",
     blurb:
-      "Explore all 118 elements, balance equations exactly, and work through moles, solutions, gases and pH with the reasoning laid out line by line.",
-    tags: ["Periodic table", "Molar mass", "Balancing", "Stoichiometry", "Solutions", "pH"],
+      "Explore all 118 elements, turn molecules and crystals in 3D, balance equations exactly, and work through moles, solutions, gases and pH with the reasoning laid out line by line.",
+    tags: ["Periodic table", "3D molecules", "Crystals", "Orbitals", "Balancing", "Stoichiometry", "pH"],
   },
   tools: [
     { id: "periodic", label: "Periodic table", glyph: "🔬", render: periodicTable },
+    ...CHEM3D_TOOLS,
     { id: "molar", label: "Molar mass", glyph: "⚖", render: molarMassTool },
     { id: "balance", label: "Equation balancer", glyph: "⚗", render: balancerTool },
     { id: "stoichiometry", label: "Reacting masses", glyph: "🧮", render: stoichiometryTool },

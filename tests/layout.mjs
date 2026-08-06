@@ -35,12 +35,15 @@ const { chromium } = playwright;
 
 const ROUTES = {
   physics: ["motion", "projectile", "dynamics", "circuits", "refraction", "lenses", "thermal", "nuclear", "reference"],
-  chemistry: ["periodic", "molar", "balance", "stoichiometry", "empirical", "solutions", "gases", "ph", "reference"],
+  chemistry: ["periodic", "molecules3d", "lattices", "orbitals", "molar", "balance", "stoichiometry", "empirical", "solutions", "gases", "ph", "reference"],
   biology: ["dna", "codons", "punnett", "populations", "cells", "microscopy", "sav", "reference"],
 };
 
 const problems = [];
-const browser = await chromium.launch();
+// SwiftShader keeps the WebGL views testable on machines with no GPU.
+const browser = await chromium.launch({
+  args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"],
+});
 const page = await browser.newPage({ viewport: { width: 1400, height: 1000 } });
 page.on("console", (message) => {
   if (message.type() === "error") problems.push(`console error: ${message.text()}`);
@@ -57,6 +60,12 @@ for (const [subject, tools] of Object.entries(ROUTES)) {
 
     const errors = await page.$$eval(".note-error", (nodes) => nodes.map((n) => n.textContent));
     if (errors.length) problems.push(`${route}: ${errors.join(" | ")}`);
+
+    // 3D tools must actually get a canvas up, not silently fall back.
+    if (["molecules3d", "lattices", "orbitals"].includes(toolId)) {
+      const canvases = await page.$$eval(".stage3d canvas", (nodes) => nodes.length);
+      if (canvases !== 1) problems.push(`${route}: expected one WebGL canvas, found ${canvases}`);
+    }
 
     const emptyOutputs = await page.$$eval(".tool-output", (nodes) => nodes.filter((n) => !n.children.length).length);
     if (emptyOutputs) problems.push(`${route}: ${emptyOutputs} tool(s) produced no output`);

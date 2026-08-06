@@ -481,3 +481,26 @@ select.input option { background: var(--panel-solid); color: var(--text); }
   * { transition: none !important; animation: none !important; }
   html { scroll-behavior: auto; }
 }
+
+/* -------------------------------------------------------------- 3D views */
+
+.figure-3d { padding: 0; overflow: hidden; }
+.figure-3d figcaption { padding: 0 0.75rem 0.6rem; }
+
+.stage3d {
+  position: relative;
+  width: 100%;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  overflow: hidden;
+  cursor: grab;
+  background:
+    radial-gradient(120% 90% at 50% 0%, color-mix(in srgb, var(--card-accent) 14%, transparent), transparent 70%),
+    color-mix(in srgb, var(--panel-solid) 62%, transparent);
+  touch-action: none; /* let OrbitControls handle drags on touch devices */
+}
+.stage3d:active { cursor: grabbing; }
+.stage3d canvas { display: block; width: 100%; height: 100%; }
+
+@media (max-width: 600px) {
+  .stage3d { height: 320px !important; }
+}

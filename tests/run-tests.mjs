@@ -11,6 +11,14 @@ import { parseFormula, molarMass, composition, balanceEquation, atomTally, empir
 import { solveSuvat, projectile, combineResistors, ohmsLaw, refract, thinLens, decay, heatTransfer } from "../assets/js/lib/physics-core.js";
 import { transcribe, translate, sequenceStats, reverseComplement, punnettSquare, hardyWeinberg, parseGenotype, magnification, surfaceAreaToVolume } from "../assets/js/lib/biology-core.js";
 import { CODON_TABLE, AMINO_ACIDS } from "../assets/js/data/reference.js";
+import {
+  MOLECULES, MOLECULES_BY_ID, buildMolecule, angleBetween, length as vlength, sub as vsub,
+  LATTICES, LATTICES_BY_ID, expandLattice, latticeBonds, atomColor, GEOMETRIES,
+} from "../assets/js/lib/molecule-core.js";
+import {
+  ORBITALS, ORBITALS_BY_ID, radialValue, mostProbableRadius, radialNodes,
+  angularValue, angularSurface, densityCloud,
+} from "../assets/js/lib/orbital-core.js";
 
 let passed = 0;
 let failed = 0;
@@ -320,6 +328,192 @@ test("surface area to volume falls as size rises", () => {
   close(small.ratio, 6, 9);
   close(large.ratio, 3, 9);
   close(surfaceAreaToVolume("sphere", 1).ratio, 3, 9);
+});
+
+/* --------------------------------------------------- Molecular geometry -- */
+
+test("every molecule builds with the right atom and bond count", () => {
+  for (const spec of MOLECULES) {
+    const molecule = buildMolecule(spec);
+    assert.ok(molecule.atoms.length >= 2, `${spec.formula} has too few atoms`);
+    assert.ok(molecule.bonds.length >= 1, `${spec.formula} has no bonds`);
+    for (const bond of molecule.bonds) {
+      assert.ok(molecule.atoms[bond.a] && molecule.atoms[bond.b], `${spec.formula} has a dangling bond`);
+    }
+    for (const atom of molecule.atoms) {
+      assert.ok(atom.position.every(Number.isFinite), `${spec.formula} produced a non-finite coordinate`);
+      assert.match(atomColor(atom.element), /^#[0-9a-f]{6}$/i);
+    }
+  }
+});
+
+test("built geometry reproduces the measured bond angles", () => {
+  // The angles are read back off the generated coordinates, so this fails if
+  // the builder places atoms anywhere other than where the data says.
+  const expected = {
+    water: 104.45, ammonia: 106.7, methane: 109.47, "carbon-dioxide": 180,
+    "sulfur-dioxide": 119.0, "boron-trifluoride": 120, "hydrogen-sulfide": 92.1,
+  };
+  for (const [id, angle] of Object.entries(expected)) {
+    const molecule = buildMolecule(MOLECULES_BY_ID.get(id));
+    close(molecule.angles[0].value, angle, 2, `${id} bond angle:`);
+  }
+});
+
+test("bond lengths in the model equal the quoted values", () => {
+  for (const spec of MOLECULES) {
+    const molecule = buildMolecule(spec);
+    for (const bond of molecule.bonds) {
+      const measured = vlength(vsub(molecule.atoms[bond.a].position, molecule.atoms[bond.b].position));
+      close(measured, bond.length, 6, `${spec.formula} ${bond.a}–${bond.b}:`);
+    }
+  }
+});
+
+test("octahedral and square planar geometries are exact", () => {
+  const sf6 = buildMolecule(MOLECULES_BY_ID.get("sulfur-hexafluoride"));
+  const angles = sf6.angles.map((a) => Math.round(a.value));
+  assert.equal(angles.filter((a) => a === 90).length, 12);
+  assert.equal(angles.filter((a) => a === 180).length, 3);
+
+  const xef4 = buildMolecule(MOLECULES_BY_ID.get("xenon-tetrafluoride"));
+  assert.ok(xef4.atoms.every((atom) => Math.abs(atom.position[2]) < 1e-9), "XeF4 should be planar");
+});
+
+test("hydrocarbon builders honour their H–C–C angles", () => {
+  for (const [id, expected] of [["ethane", 111.2], ["ethene", 121.3], ["ethyne", 180]]) {
+    const m = buildMolecule(MOLECULES_BY_ID.get(id));
+    const p = m.atoms.map((a) => a.position);
+    close(angleBetween(p[2], p[0], p[1]), expected, 6, `${id} H–C–C:`);
+  }
+  // Ethene must come out planar; ethane's hydrogens must be staggered.
+  const ethene = buildMolecule(MOLECULES_BY_ID.get("ethene"));
+  assert.ok(ethene.atoms.every((a) => Math.abs(a.position[1]) < 1e-9), "ethene should be planar");
+});
+
+test("benzene is a regular planar ring", () => {
+  const benzene = buildMolecule(MOLECULES_BY_ID.get("benzene"));
+  assert.equal(benzene.atoms.length, 12);
+  assert.ok(benzene.atoms.every((a) => a.position[2] === 0), "benzene should be planar");
+  const carbons = benzene.atoms.slice(0, 6).map((a) => a.position);
+  for (let i = 0; i < 6; i += 1) {
+    close(vlength(vsub(carbons[i], carbons[(i + 1) % 6])), 1.397, 6, "benzene C–C:");
+    close(angleBetween(carbons[(i + 5) % 6], carbons[i], carbons[(i + 1) % 6]), 120, 6, "benzene C–C–C:");
+  }
+});
+
+test("VSEPR direction sets are unit vectors", () => {
+  for (const [name, geometry] of Object.entries(GEOMETRIES)) {
+    for (const direction of geometry.directions(geometry.idealAngle)) {
+      close(Math.hypot(...direction), 1, 9, `${name} direction:`);
+    }
+  }
+});
+
+/* --------------------------------------------------------- Crystal cells -- */
+
+test("lattices reproduce their published nearest-neighbour distances", () => {
+  const expected = {
+    nacl: 2.8201,      // a/2
+    cscl: 3.5706,      // a√3/2
+    diamond: 1.5446,   // a√3/4
+    copper: 2.5561,    // a/√2
+    iron: 2.4825,      // a√3/2
+    zincblende: 2.3423,
+  };
+  for (const [id, distance] of Object.entries(expected)) {
+    const atoms = expandLattice(LATTICES_BY_ID.get(id), 1);
+    let nearest = Infinity;
+    for (let i = 0; i < atoms.length; i += 1) {
+      for (let j = i + 1; j < atoms.length; j += 1) {
+        nearest = Math.min(nearest, vlength(vsub(atoms[i].position, atoms[j].position)));
+      }
+    }
+    close(nearest, distance, 3, `${id} nearest neighbour:`);
+  }
+});
+
+test("lattice expansion grows and stays centred", () => {
+  for (const lattice of LATTICES) {
+    const one = expandLattice(lattice, 1);
+    const two = expandLattice(lattice, 2);
+    assert.ok(two.length > one.length, `${lattice.id} did not grow`);
+    for (const atom of two) {
+      assert.ok(atom.position.every(Number.isFinite), `${lattice.id} produced a bad coordinate`);
+      assert.ok(Math.max(...atom.position.map(Math.abs)) <= lattice.a * 2, `${lattice.id} atom outside the block`);
+    }
+  }
+});
+
+test("diamond has four bonds per interior atom", () => {
+  const atoms = expandLattice(LATTICES_BY_ID.get("diamond"), 2);
+  const bonds = latticeBonds(atoms, 1.6);
+  const degree = new Map();
+  for (const bond of bonds) {
+    degree.set(bond.a, (degree.get(bond.a) || 0) + 1);
+    degree.set(bond.b, (degree.get(bond.b) || 0) + 1);
+  }
+  // Interior atoms reach the full coordination of four; surface atoms cannot.
+  assert.equal(Math.max(...degree.values()), 4);
+});
+
+/* ------------------------------------------------------------- Orbitals -- */
+
+test("radial functions are normalised", () => {
+  for (const orbital of ORBITALS) {
+    let integral = 0;
+    const dr = 0.002;
+    for (let r = dr; r < 120; r += dr) integral += radialValue(orbital, r) ** 2 * r * r * dr;
+    close(integral, 1, 3, `${orbital.id} radial normalisation:`);
+  }
+});
+
+test("orbital node counts follow the quantum numbers", () => {
+  for (const orbital of ORBITALS) {
+    assert.equal(
+      radialNodes(orbital).length,
+      orbital.n - orbital.l - 1,
+      `${orbital.id} should have n − l − 1 radial nodes`
+    );
+  }
+  assert.deepEqual(radialNodes(ORBITALS_BY_ID.get("2s")), [2]); // exactly 2a₀
+});
+
+test("most probable radius matches the analytic results", () => {
+  close(mostProbableRadius(ORBITALS_BY_ID.get("1s")), 1, 2, "1s peaks at the Bohr radius:");
+  close(mostProbableRadius(ORBITALS_BY_ID.get("2pz")), 4, 2, "2p peaks at 4a₀:");
+  close(mostProbableRadius(ORBITALS_BY_ID.get("3dz2")), 9, 2, "3d peaks at 9a₀:");
+});
+
+test("angular functions have the right nodal structure", () => {
+  const pz = ORBITALS_BY_ID.get("2pz");
+  // p_z vanishes in the xy-plane and is antisymmetric about it.
+  close(angularValue(pz, Math.PI / 2, 0), 0, 9);
+  close(angularValue(pz, 0, 0), -angularValue(pz, Math.PI, 0), 9);
+  // d_xy vanishes on both nodal planes.
+  const dxy = ORBITALS_BY_ID.get("3dxy");
+  close(angularValue(dxy, Math.PI / 2, 0), 0, 9);
+  close(angularValue(dxy, Math.PI / 2, Math.PI / 2), 0, 9);
+});
+
+test("renderable geometry comes out well formed", () => {
+  const surface = angularSurface(ORBITALS_BY_ID.get("2pz"), { segments: 24 });
+  assert.ok(surface.positions.length > 0 && surface.positions.every(Number.isFinite));
+  assert.equal(surface.positions.length / 3, surface.phases.length);
+  assert.equal(surface.indices.length % 3, 0);
+  assert.ok(Math.max(...surface.indices) < surface.positions.length / 3, "index out of range");
+
+  const cloud = densityCloud(ORBITALS_BY_ID.get("2pz"), { count: 500 });
+  assert.equal(cloud.points.length / 3, cloud.phases.length);
+  assert.ok(cloud.points.every(Number.isFinite));
+  // A p orbital's two lobes carry opposite phase, so both signs must appear.
+  assert.ok(cloud.phases.some((p) => p > 0) && cloud.phases.some((p) => p < 0));
+});
+
+test("density sampling is deterministic", () => {
+  const a = densityCloud(ORBITALS_BY_ID.get("1s"), { count: 200, seed: 3 });
+  const b = densityCloud(ORBITALS_BY_ID.get("1s"), { count: 200, seed: 3 });
+  assert.deepEqual(a.points, b.points);
 });
 
 /* ------------------------------------------------------------------ Report */
