@@ -51,6 +51,10 @@ load over `file://`.
 ### 🧬 Biology
 | Tool | What it does |
 |---|---|
+| Beating heart | A live cardiac cycle: chambers contract, valves open and shut on the pressure gradient, blood moves only through open valves, with the Wiggers pressure and volume curves alongside |
+| Airway tree | The bronchial tree grown from Weibel's morphometry, 4–10 generations, with the total cross-sectional area curve that explains gas exchange |
+| Action potential | The Hodgkin–Huxley equations integrated live, firing down a myelinated axon — drop below threshold and the spike vanishes rather than shrinking |
+| DNA helix | Your sequence built at B-form crystallographic dimensions, base-paired and colour-coded |
 | DNA → protein | Transcription and translation with coloured strands, per-codon chips, GC content and melting temperature |
 | Genetic code | All 64 codons, coloured by amino acid chemistry |
 | Punnett square | Monohybrid and dihybrid crosses with genotype and phenotype ratios |
@@ -82,6 +86,33 @@ Atom colours follow the Jmol/PyMOL convention that molecular viewers use, which 
 also the legible choice — the original CPK black carbon vanishes on a dark
 background. Every atom carries its element symbol as a label regardless.
 
+## Anatomy is derived, not sculpted
+
+The 3D human biology is generated from the quantitative models physiologists use,
+which is why the numbers on screen are the numbers that built the picture:
+
+- **The airway tree** follows Weibel's model A: each generation's diameter and length
+  scale by 2^(−1/3) while the count doubles. That is why the total cross-section climbs
+  from 2.5 cm² at the trachea to over 500 cm² at the alveoli — and why air slows almost
+  to a stop, leaving the last millimetre to diffusion.
+- **The heart** runs on measured chamber pressures. Nothing about the valves is
+  keyframed: the mitral valve opens whenever atrial pressure exceeds ventricular, and
+  the aortic valve opens when ventricular exceeds aortic. The isovolumetric phases fall
+  out of that on their own — both valves shut, so the volume cannot change however hard
+  the muscle squeezes. Stroke volume 70 mL, cardiac output 5.25 L·min⁻¹, ejection
+  fraction 58%.
+- **The action potential** is the 1952 Hodgkin–Huxley system integrated in the browser,
+  with the original squid-axon conductances. The spike overshoots to about +40 mV,
+  repolarises past rest into an after-hyperpolarisation, and is genuinely all-or-nothing
+  — tripling the stimulus does not make it taller.
+- **DNA** uses B-form parameters: 3.4 Å rise, 34.3° twist, 10.5 base pairs per turn,
+  20 Å diameter, and the 140° offset between backbones that produces one wide groove
+  and one narrow one.
+
+What this deliberately is *not* is a photoreal cadaver model — those are licensed
+commercial assets. Every structure here is computed, which is the point: change the
+model and the anatomy changes with it.
+
 ## Design notes
 
 - **Colour is never the only cue.** The element category palette was solved for maximum
@@ -110,10 +141,12 @@ assets/
     lib/three-stage.js      shared three.js scene, controls and disposal
     lib/physics-core.js     SUVAT, projectiles, circuits, optics, decay
     lib/biology-core.js     central dogma, Mendelian and population genetics
+    lib/anatomy-core.js     Weibel airways, cardiac cycle, Hodgkin-Huxley, B-DNA
     lib/chart.js            inline-SVG plotting with a crosshair readout
     lib/ui.js               DOM helpers, number formatting, tool scaffold
     modules/{physics,chemistry,biology}.js
     modules/chem3d.js       3D molecule, lattice and orbital viewers
+    modules/bio3d.js        beating heart, airway tree, action potential, helix
 vendor/three/               three.js r185 + OrbitControls (vendored, offline)
 tests/
   run-tests.mjs             engine tests (no dependencies)
@@ -126,8 +159,8 @@ reused elsewhere.
 ## Tests
 
 ```bash
-npm test              # 50 engine tests, no dependencies
-npm run test:browser  # renders all 29 tools, checks errors, WebGL canvases and label collisions
+npm test              # 63 engine tests, no dependencies
+npm run test:browser  # renders all 33 tools, checks errors, WebGL canvases and label collisions
 ```
 
 The browser suite needs Playwright and a server running on port 8899; it skips itself if

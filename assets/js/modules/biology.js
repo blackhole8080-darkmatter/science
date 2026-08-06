@@ -9,6 +9,7 @@ import {
   cleanSequence, transcribe, translate, sequenceStats, reverseComplement,
   punnettSquare, hardyWeinberg, magnification, surfaceAreaToVolume,
 } from "../lib/biology-core.js";
+import { BIO3D_TOOLS } from "./bio3d.js";
 
 const ACCENT = "var(--bio)";
 const num = (input) => {
@@ -613,10 +614,11 @@ export default {
   hero: {
     title: "Biology workspace",
     blurb:
-      "Run DNA through transcription and translation, model inheritance with Punnett squares and Hardy–Weinberg, and explore cell structure interactively.",
-    tags: ["Central dogma", "Genetic code", "Punnett squares", "Populations", "Cells", "Microscopy"],
+      "Watch a heart beat through its measured pressure cycle, grow the airway tree from Weibel's model, fire a Hodgkin–Huxley action potential, then work through the central dogma, inheritance and cell structure.",
+    tags: ["Beating heart", "Airways", "Action potential", "DNA in 3D", "Central dogma", "Genetics", "Cells"],
   },
   tools: [
+    ...BIO3D_TOOLS,
     { id: "dna", label: "DNA → protein", glyph: "🧬", render: dnaTool },
     { id: "codons", label: "Genetic code", glyph: "🔤", render: codonTableCard },
     { id: "punnett", label: "Punnett square", glyph: "🟩", render: punnettTool },

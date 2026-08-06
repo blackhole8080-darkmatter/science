@@ -105,6 +105,8 @@ export function createStage({ height = 420, distance = 12, caption = "", autoRot
   let disposed = false;
   let visible = true;
   const themeListeners = new Set();
+  const frameListeners = new Set();
+  let lastFrameTime = 0;
 
   // Re-render on a theme switch, whether it came from the app's own toggle
   // (which stamps data-theme) or from the operating system preference.
@@ -138,10 +140,18 @@ export function createStage({ height = 420, distance = 12, caption = "", autoRot
   );
   intersectionObserver.observe(canvasHost);
 
-  const animate = () => {
+  const animate = (now = 0) => {
     if (disposed) return;
     requestAnimationFrame(animate);
-    if (!visible) return;
+    if (!visible) {
+      lastFrameTime = now;
+      return;
+    }
+    // Seconds since the previous drawn frame, clamped so a backgrounded tab
+    // does not resume with one enormous jump in the simulation.
+    const delta = lastFrameTime ? Math.min((now - lastFrameTime) / 1000, 0.1) : 0;
+    lastFrameTime = now;
+    for (const listener of frameListeners) listener(delta, now / 1000);
     controls.update();
     renderer.render(scene, camera);
   };
@@ -213,6 +223,14 @@ export function createStage({ height = 420, distance = 12, caption = "", autoRot
     onThemeChange(callback) {
       themeListeners.add(callback);
     },
+    /**
+     * Run `callback(deltaSeconds, elapsedSeconds)` before each rendered frame.
+     * Only fires while the canvas is on screen, and is cleared on dispose.
+     */
+    onFrame(callback) {
+      frameListeners.add(callback);
+      return () => frameListeners.delete(callback);
+    },
     dispose() {
       if (disposed) return;
       disposed = true;
@@ -222,6 +240,7 @@ export function createStage({ height = 420, distance = 12, caption = "", autoRot
       themeObserver.disconnect();
       colorSchemeQuery.removeEventListener("change", notifyTheme);
       themeListeners.clear();
+      frameListeners.clear();
       controls.dispose();
       disposeNode(scene);
       renderer.dispose();
@@ -287,27 +306,53 @@ export function bondMesh({ from, to, radius = 0.09, colorFrom, colorTo, segments
  * the moment the viewer switches to light mode.
  */
 export function labelSprite(text, { color, halo, size = 0.5 } = {}) {
+  const label = String(text);
+  const fontSize = 72;
   const canvas = document.createElement("canvas");
-  const scale = 128;
-  canvas.width = scale;
-  canvas.height = scale;
   const context = canvas.getContext("2d");
-  context.fillStyle = color || cssColor("--text", "#ffffff");
-  context.font = "bold 72px 'Inter', system-ui, sans-serif";
+
+  // Size the canvas to the text before drawing — a fixed square silently
+  // crops anything longer than a couple of characters.
+  const font = `bold ${fontSize}px 'Inter', system-ui, sans-serif`;
+  context.font = font;
+  const padding = fontSize * 0.4;
+  const width = Math.ceil(context.measureText(label).width + padding * 2);
+  const height = Math.ceil(fontSize * 1.5);
+  canvas.width = width;
+  canvas.height = height;
+
+  // Resizing the canvas resets the context, so restate everything.
+  context.font = font;
   context.textAlign = "center";
   context.textBaseline = "middle";
   context.lineWidth = 9;
   context.strokeStyle = halo || cssColor("--panel-solid", "#000000");
-  context.strokeText(text, scale / 2, scale / 2);
-  context.fillText(text, scale / 2, scale / 2);
+  context.fillStyle = color || cssColor("--text", "#ffffff");
+  context.lineJoin = "round";
+  context.strokeText(label, width / 2, height / 2);
+  context.fillText(label, width / 2, height / 2);
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false });
   const sprite = new THREE.Sprite(material);
-  sprite.scale.set(size, size, size);
+  // Keep the aspect ratio so wide labels are not squeezed.
+  sprite.scale.set((size * width) / height, size, size);
   sprite.renderOrder = 10;
   return sprite;
+}
+
+export function tubeMesh(points, { radius = 0.2, color = "#ffffff", segments = null, radialSegments = 12, opacity = 1 } = {}) {
+  const curve = new THREE.CatmullRomCurve3(points.map((p) => new THREE.Vector3(...p)));
+  const geometry = new THREE.TubeGeometry(curve, segments || Math.max(8, points.length * 4), radius, radialSegments, false);
+  const material = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(color),
+    roughness: 0.45,
+    metalness: 0.05,
+    transparent: opacity < 1,
+    opacity,
+  });
+  return new THREE.Mesh(geometry, material);
 }
 
 /** Dashed line, used for lone pairs and unit-cell edges. */

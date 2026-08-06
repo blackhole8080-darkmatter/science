@@ -19,6 +19,12 @@ import {
   ORBITALS, ORBITALS_BY_ID, radialValue, mostProbableRadius, radialNodes,
   angularValue, angularSurface, densityCloud,
 } from "../assets/js/lib/orbital-core.js";
+import {
+  airwayGeneration, airwayTable, bronchialTree, WEIBEL,
+  cardiacState, haemodynamics, CARDIAC,
+  simulateActionPotential, findThreshold, restingGates, HH,
+  dnaHelix, B_DNA,
+} from "../assets/js/lib/anatomy-core.js";
 
 let passed = 0;
 let failed = 0;
@@ -514,6 +520,155 @@ test("density sampling is deterministic", () => {
   const a = densityCloud(ORBITALS_BY_ID.get("1s"), { count: 200, seed: 3 });
   const b = densityCloud(ORBITALS_BY_ID.get("1s"), { count: 200, seed: 3 });
   assert.deepEqual(a.points, b.points);
+});
+
+/* ------------------------------------------------------------- Physiology - */
+
+test("airway dimensions follow the 2^(-1/3) scaling", () => {
+  const trachea = airwayGeneration(0);
+  close(trachea.diameter, WEIBEL.trachealDiameter, 9);
+  close(trachea.count, 1, 9);
+  for (let n = 1; n <= 20; n += 1) {
+    const parent = airwayGeneration(n - 1);
+    const child = airwayGeneration(n);
+    close(child.diameter / parent.diameter, Math.cbrt(0.5), 9, `generation ${n} diameter ratio:`);
+    assert.equal(child.count, parent.count * 2, `generation ${n} count`);
+  }
+  // Published values: terminal bronchioles are about half a millimetre across.
+  close(airwayGeneration(16).diameter, 0.0446, 3);
+});
+
+test("total airway cross-section grows with depth", () => {
+  const rows = airwayTable(23);
+  for (let n = 1; n < rows.length; n += 1) {
+    assert.ok(
+      rows[n].totalCrossSection > rows[n - 1].totalCrossSection,
+      `cross-section should rise at generation ${n}`
+    );
+  }
+  // Each generation multiplies the area by 2^(1/3).
+  close(rows[1].totalCrossSection / rows[0].totalCrossSection, Math.cbrt(2), 6);
+  assert.ok(rows.at(-1).totalCrossSection > 400, "alveolar cross-section should exceed 400 cm²");
+});
+
+test("the bronchial tree is a complete binary tree", () => {
+  for (const depth of [3, 6, 8]) {
+    const tree = bronchialTree({ depth });
+    assert.equal(tree.segments.length, 2 ** (depth + 1) - 1, `depth ${depth} segment count`);
+    for (const segment of tree.segments) {
+      assert.ok(segment.from.every(Number.isFinite) && segment.to.every(Number.isFinite));
+      // Each segment's drawn length must equal its Weibel length.
+      const drawn = Math.hypot(...segment.to.map((v, i) => v - segment.from[i]));
+      close(drawn, airwayGeneration(segment.generation).length, 6, `generation ${segment.generation} length:`);
+    }
+  }
+});
+
+test("cardiac valves follow the pressure gradients", () => {
+  for (let i = 0; i <= 200; i += 1) {
+    const state = cardiacState(i / 200);
+    assert.equal(state.mitralOpen, state.atrialPressure > state.ventricularPressure, `mitral at ${i / 200}`);
+    assert.equal(state.aorticOpen, state.ventricularPressure > state.aorticPressure, `aortic at ${i / 200}`);
+    // Both valves shut during the isovolumetric phases.
+    if (state.label.startsWith("Isovolumetric")) {
+      assert.ok(!state.mitralOpen && !state.aorticOpen, `both valves should be shut during ${state.label}`);
+    }
+  }
+});
+
+test("ventricular volume stays within its physiological range", () => {
+  let min = Infinity;
+  let max = -Infinity;
+  for (let i = 0; i <= 400; i += 1) {
+    const { ventricularVolume: v } = cardiacState(i / 400);
+    min = Math.min(min, v);
+    max = Math.max(max, v);
+  }
+  close(min, CARDIAC.endSystolicVolume, 6);
+  close(max, CARDIAC.endDiastolicVolume, 6);
+});
+
+test("haemodynamics match the textbook figures", () => {
+  const stats = haemodynamics(75);
+  close(stats.strokeVolume, 70, 9);
+  close(stats.cardiacOutput, 5.25, 6);
+  close(stats.ejectionFraction, 58.333, 2);
+  close(stats.cycleDuration, 0.8, 9);
+  // Output scales with rate.
+  close(haemodynamics(150).cardiacOutput, 10.5, 6);
+});
+
+test("the cardiac cycle wraps cleanly", () => {
+  const start = cardiacState(0);
+  const wrapped = cardiacState(1);
+  close(wrapped.ventricularPressure, start.ventricularPressure, 6);
+  close(cardiacState(-0.25).phase, 0.75, 9);
+});
+
+test("Hodgkin-Huxley gates rest between zero and one", () => {
+  const gates = restingGates();
+  for (const [name, value] of Object.entries(gates)) {
+    assert.ok(value > 0 && value < 1, `${name} should rest in (0, 1), got ${value}`);
+  }
+  // At rest sodium is mostly shut and its inactivation gate mostly open.
+  assert.ok(gates.m < 0.1, "m gate should rest nearly closed");
+  assert.ok(gates.h > 0.5, "h gate should rest mostly open");
+});
+
+test("the action potential is all-or-nothing", () => {
+  const threshold = findThreshold();
+  assert.ok(threshold > 0 && threshold < 40, `threshold out of range: ${threshold}`);
+
+  const below = simulateActionPotential({ stimulus: threshold * 0.9 });
+  const above = simulateActionPotential({ stimulus: threshold * 1.1 });
+  assert.equal(below.fired, false, "a subthreshold stimulus must not fire");
+  assert.equal(above.fired, true, "a suprathreshold stimulus must fire");
+
+  // A much larger stimulus gives essentially the same spike height, which is
+  // what "all-or-nothing" means.
+  const strong = simulateActionPotential({ stimulus: threshold * 3 });
+  assert.ok(Math.abs(strong.peak - above.peak) < 12, "spike amplitude should not scale with stimulus");
+  assert.ok(above.peak > 0, "a spike must overshoot 0 mV");
+});
+
+test("the membrane rests at the resting potential", () => {
+  const quiet = simulateActionPotential({ stimulus: 0, duration: 20 });
+  for (const sample of quiet.trace) {
+    close(sample.v, HH.restingPotential, 1, "unstimulated membrane:");
+  }
+});
+
+test("the action potential repolarises below rest", () => {
+  const spike = simulateActionPotential({ stimulus: 15, duration: 40 });
+  const afterSpike = spike.trace.filter((s) => s.t > 10);
+  const trough = Math.min(...afterSpike.map((s) => s.v));
+  assert.ok(trough < HH.restingPotential, "there should be an after-hyperpolarisation");
+});
+
+test("B-DNA is built to crystallographic dimensions", () => {
+  const helix = dnaHelix("ATGCATGCATGCATGCATGCA");
+  assert.equal(helix.pairs.length, 21);
+  close(helix.length, 21 * B_DNA.rise, 6);
+
+  for (let i = 1; i < helix.strandA.length; i += 1) {
+    close(helix.strandA[i].position[1] - helix.strandA[i - 1].position[1], B_DNA.rise, 6, "rise per base pair:");
+  }
+  // Both backbones sit on a cylinder of the published radius.
+  for (const point of [...helix.strandA, ...helix.strandB]) {
+    close(Math.hypot(point.position[0], point.position[2]), B_DNA.radius, 6, "backbone radius:");
+  }
+  close(360 / B_DNA.twist, 10.5, 1, "base pairs per turn:");
+});
+
+test("DNA pairing and bond counts are correct", () => {
+  const helix = dnaHelix("AATTGGCC");
+  const pairing = { A: "T", T: "A", G: "C", C: "G" };
+  for (const pair of helix.pairs) {
+    assert.equal(pair.partner, pairing[pair.base], `${pair.base} should pair with ${pairing[pair.base]}`);
+    assert.equal(pair.hydrogenBonds, pair.base === "G" || pair.base === "C" ? 3 : 2);
+  }
+  close(helix.gcContent, 50, 9);
+  assert.throws(() => dnaHelix("XYZ"), /sequence/);
 });
 
 /* ------------------------------------------------------------------ Report */
