@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Science Lab — Biology, Physics & Chemistry</title>
+    <meta
+      name="description"
+      content="An interactive biology, physics and chemistry workspace: calculators that show their working, an interactive periodic table, equation balancing, genetics tools and scientific diagrams."
+    />
+    <link rel="stylesheet" href="assets/css/styles.css" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A7%AA%3C/text%3E%3C/svg%3E"
+    />
+  </head>
+  <body>
+    <header class="masthead">
+      <div class="masthead-inner">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">⚗</div>
+          <div class="brand-text">
+            <strong>Science Lab</strong>
+            <span>Biology · Physics · Chemistry</span>
+          </div>
+        </div>
+        <nav id="subject-nav" class="subject-nav" role="tablist" aria-label="Subject"></nav>
+        <button id="theme-toggle" class="icon-btn" type="button" aria-label="Switch theme">☀️</button>
+      </div>
+    </header>
+
+    <div class="layout">
+      <aside id="tool-rail" class="rail" aria-label="Tools"></aside>
+      <main id="stage" class="stage"></main>
+    </div>
+
+    <footer class="footer">
+      <p>
+        Built for study and revision. Every calculator shows its working — check the reasoning, don't just copy the answer.
+      </p>
+    </footer>
+
+    <noscript>
+      <p style="padding: 2rem; text-align: center">
+        This workspace runs its calculations in the browser, so JavaScript needs to be enabled.
+      </p>
+    </noscript>
+
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "./vendor/three/three.module.js"
+        }
+      }
+    </script>
+    <script type="module" src="assets/js/app.js"></script>
+  </body>
+</html>
