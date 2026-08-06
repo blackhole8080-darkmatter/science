@@ -7,6 +7,10 @@
   "scripts": {
     "start": "python3 -m http.server 8899",
     "test": "node tests/run-tests.mjs",
-    "test:browser": "node tests/layout.mjs"
+    "test:browser": "node tests/layout.mjs",
+    "build:preview": "node tools/build-preview.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.1"
   }
 }

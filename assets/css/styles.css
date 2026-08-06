@@ -23,6 +23,7 @@
   --text: #eef1ff;
   --muted: #9aa3c9;
   --danger: #ff6b6b;
+  --danger-text: #ffc9c9;
   --ok: #1dd1a1;
 
   --accent: var(--phys);
@@ -35,7 +36,29 @@
   --sans: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
 }
 
-[data-theme="light"] {
+/*
+ * Light theme tokens. Applied two ways: when the viewer's OS asks for light and
+ * nothing has stamped an explicit choice, and whenever the theme toggle sets
+ * data-theme="light" — which must win over the OS preference in both
+ * directions. Components are styled through the tokens, never inside the media
+ * query, so there is one source of truth per theme.
+ */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #f4f6ff;
+    --bg-2: #e8ecfb;
+    --panel: rgba(255, 255, 255, 0.85);
+    --panel-solid: #ffffff;
+    --line: rgba(19, 27, 60, 0.14);
+    --line-soft: rgba(19, 27, 60, 0.07);
+    --text: #131b3c;
+    --muted: #5a648f;
+    --danger-text: #a12525;
+    --shadow: 0 16px 34px rgba(28, 40, 90, 0.12);
+  }
+}
+
+:root[data-theme="light"] {
   --bg: #f4f6ff;
   --bg-2: #e8ecfb;
   --panel: rgba(255, 255, 255, 0.85);
@@ -44,6 +67,7 @@
   --line-soft: rgba(19, 27, 60, 0.07);
   --text: #131b3c;
   --muted: #5a648f;
+  --danger-text: #a12525;
   --shadow: 0 16px 34px rgba(28, 40, 90, 0.12);
 }
 
@@ -320,9 +344,9 @@ select.input option { background: var(--panel-solid); color: var(--text); }
 
 .note { font-size: 0.85rem; padding: 0.6rem 0.8rem; border-radius: var(--radius-sm); margin: 0; border: 1px solid var(--line); }
 .note-info { background: var(--accent-soft); color: var(--text); }
-.note-error { background: rgba(255, 107, 107, 0.14); border-color: rgba(255, 107, 107, 0.5); color: #ffc9c9; }
+.note-error { background: rgba(255, 107, 107, 0.14); border-color: rgba(255, 107, 107, 0.5); color: var(--danger-text); }
 .note-ok { background: rgba(29, 209, 161, 0.14); border-color: rgba(29, 209, 161, 0.45); }
-[data-theme="light"] .note-error { color: #a12525; }
+
 
 .steps { margin: 0; padding-left: 1.2rem; display: grid; gap: 0.4rem; font-size: 0.88rem; color: var(--muted); }
 .steps li::marker { color: var(--card-accent); font-weight: 700; }

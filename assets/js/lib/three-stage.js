@@ -104,6 +104,18 @@ export function createStage({ height = 420, distance = 12, caption = "", autoRot
 
   let disposed = false;
   let visible = true;
+  const themeListeners = new Set();
+
+  // Re-render on a theme switch, whether it came from the app's own toggle
+  // (which stamps data-theme) or from the operating system preference.
+  const notifyTheme = () => {
+    if (disposed) return;
+    for (const listener of themeListeners) listener();
+  };
+  const themeObserver = new MutationObserver(notifyTheme);
+  themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  const colorSchemeQuery = window.matchMedia("(prefers-color-scheme: light)");
+  colorSchemeQuery.addEventListener("change", notifyTheme);
 
   const resize = () => {
     const width = canvasHost.clientWidth || 600;
@@ -197,12 +209,19 @@ export function createStage({ height = 420, distance = 12, caption = "", autoRot
     setAutoRotate(on) {
       controls.autoRotate = on;
     },
+    /** Run `callback` whenever the page theme changes. Cleared on dispose. */
+    onThemeChange(callback) {
+      themeListeners.add(callback);
+    },
     dispose() {
       if (disposed) return;
       disposed = true;
       liveStages.delete(stage);
       resizeObserver.disconnect();
       intersectionObserver.disconnect();
+      themeObserver.disconnect();
+      colorSchemeQuery.removeEventListener("change", notifyTheme);
+      themeListeners.clear();
       controls.dispose();
       disposeNode(scene);
       renderer.dispose();
@@ -261,19 +280,24 @@ export function bondMesh({ from, to, radius = 0.09, colorFrom, colorTo, segments
   return group;
 }
 
-/** A flat text label that always faces the camera. */
-export function labelSprite(text, { color = "#ffffff", size = 0.5 } = {}) {
+/**
+ * A flat text label that always faces the camera.
+ * The fill and halo default to the page's own text and surface colours, so a
+ * label stays legible in either theme — white-on-white is otherwise invisible
+ * the moment the viewer switches to light mode.
+ */
+export function labelSprite(text, { color, halo, size = 0.5 } = {}) {
   const canvas = document.createElement("canvas");
   const scale = 128;
   canvas.width = scale;
   canvas.height = scale;
   const context = canvas.getContext("2d");
-  context.fillStyle = color;
+  context.fillStyle = color || cssColor("--text", "#ffffff");
   context.font = "bold 72px 'Inter', system-ui, sans-serif";
   context.textAlign = "center";
   context.textBaseline = "middle";
-  context.lineWidth = 8;
-  context.strokeStyle = "rgba(0,0,0,0.55)";
+  context.lineWidth = 9;
+  context.strokeStyle = halo || cssColor("--panel-solid", "#000000");
   context.strokeText(text, scale / 2, scale / 2);
   context.fillText(text, scale / 2, scale / 2);
 

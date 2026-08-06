@@ -20,19 +20,57 @@ let current = { subject: SUBJECTS[0], tool: SUBJECTS[0].tools[0] };
 
 /* ------------------------------------------------------------- Theme ---- */
 
-const storedTheme = localStorage.getItem("science-lab-theme");
+/**
+ * Theme preference is a nicety, not a requirement — embedded and sandboxed
+ * contexts can refuse storage access entirely, which must not break the page.
+ */
+const storage = {
+  get(key) {
+    try {
+      return localStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  },
+  set(key, value) {
+    try {
+      localStorage.setItem(key, value);
+    } catch {
+      /* preference simply is not remembered */
+    }
+  },
+};
+
+const prefersLight = window.matchMedia("(prefers-color-scheme: light)");
+
+/**
+ * The theme actually on screen. An explicit choice always wins; with no choice
+ * stamped, the page follows the operating system. Reading this rather than the
+ * attribute alone is what makes the first click on the toggle do something when
+ * the OS preference and the app's default disagree.
+ */
+function effectiveTheme() {
+  return document.documentElement.dataset.theme || (prefersLight.matches ? "light" : "dark");
+}
+
+const storedTheme = storage.get("science-lab-theme");
 if (storedTheme) document.documentElement.dataset.theme = storedTheme;
 syncThemeButton();
 
 themeToggle.addEventListener("click", () => {
-  const next = document.documentElement.dataset.theme === "light" ? "dark" : "light";
+  const next = effectiveTheme() === "light" ? "dark" : "light";
   document.documentElement.dataset.theme = next;
-  localStorage.setItem("science-lab-theme", next);
+  storage.set("science-lab-theme", next);
   syncThemeButton();
 });
 
+// Follow the OS while the viewer has not made a choice of their own.
+prefersLight.addEventListener("change", () => {
+  if (!document.documentElement.dataset.theme) syncThemeButton();
+});
+
 function syncThemeButton() {
-  const light = document.documentElement.dataset.theme === "light";
+  const light = effectiveTheme() === "light";
   themeToggle.textContent = light ? "🌙" : "☀️";
   themeToggle.setAttribute("aria-label", light ? "Switch to dark theme" : "Switch to light theme");
 }

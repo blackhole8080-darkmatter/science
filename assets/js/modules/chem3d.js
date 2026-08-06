@@ -136,6 +136,8 @@ function moleculeViewer() {
   for (const control of [chooser, styleChooser, showLonePairs, spin]) {
     control.input.addEventListener("change", render);
   }
+  // Atom labels are baked into textures, so they must be redrawn on a theme flip.
+  stage.onThemeChange?.(render);
   render();
 
   return h(
