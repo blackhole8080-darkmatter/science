@@ -51,6 +51,7 @@ load over `file://`.
 ### 🧬 Biology
 | Tool | What it does |
 |---|---|
+| Body explorer | The whole body: skeleton, brain, heart, lungs, liver, gut, kidneys and more, placed to scale on a 175 cm reference body. Toggle systems as layers, click any structure to inspect it, isolate or ghost the rest |
 | Beating heart | A live cardiac cycle: chambers contract, valves open and shut on the pressure gradient, blood moves only through open valves, with the Wiggers pressure and volume curves alongside |
 | Airway tree | The bronchial tree grown from Weibel's morphometry, 4–10 generations, with the total cross-sectional area curve that explains gas exchange |
 | Action potential | The Hodgkin–Huxley equations integrated live, firing down a myelinated axon — drop below threshold and the spike vanishes rather than shrinking |
@@ -109,9 +110,21 @@ which is why the numbers on screen are the numbers that built the picture:
   20 Å diameter, and the 140° offset between backbones that produces one wide groove
   and one narrow one.
 
-What this deliberately is *not* is a photoreal cadaver model — those are licensed
-commercial assets. Every structure here is computed, which is the point: change the
-model and the anatomy changes with it.
+- **The body explorer** places 17 structures across 7 systems on a 175 cm reference
+  body. The spine carries its real cervical, thoracic and lumbar curves; the 24
+  presacral vertebrae grow from cervical to lumbar because load does; ribs are
+  classified true, false and floating and swept accordingly; the right lung has three
+  lobes and the left two, because the left yields space to the heart.
+
+What this deliberately is *not* is a photoreal, imaging-segmented atlas. It is
+anatomically placed and correctly scaled, but schematic — it will not match an
+individual patient and is not for clinical use.
+
+Scanned meshes can replace any structure without touching code: drop a glTF into
+`assets/anatomy/` and name it in `manifest.json`. **Read `assets/anatomy/README.md`
+first** — it lists the open atlases (BodyParts3D, Z-Anatomy, OpenAnatomy) with their
+licences, and explains two traps: CC BY-SA share-alike is viral, and a model with no
+stated licence is not free to use, however public it looks.
 
 ## Design notes
 
@@ -142,11 +155,14 @@ assets/
     lib/physics-core.js     SUVAT, projectiles, circuits, optics, decay
     lib/biology-core.js     central dogma, Mendelian and population genetics
     lib/anatomy-core.js     Weibel airways, cardiac cycle, Hodgkin-Huxley, B-DNA
+    lib/body-core.js        whole-body structures, systems, spine and rib geometry
     lib/chart.js            inline-SVG plotting with a crosshair readout
     lib/ui.js               DOM helpers, number formatting, tool scaffold
     modules/{physics,chemistry,biology}.js
     modules/chem3d.js       3D molecule, lattice and orbital viewers
     modules/bio3d.js        beating heart, airway tree, action potential, helix
+    modules/body3d.js       whole-body explorer with system layers and picking
+assets/anatomy/             optional scanned meshes (empty; see its README)
 vendor/three/               three.js r185 + OrbitControls (vendored, offline)
 tests/
   run-tests.mjs             engine tests (no dependencies)
@@ -159,8 +175,8 @@ reused elsewhere.
 ## Tests
 
 ```bash
-npm test              # 63 engine tests, no dependencies
-npm run test:browser  # renders all 33 tools, checks errors, WebGL canvases and label collisions
+npm test              # 70 engine tests, no dependencies
+npm run test:browser  # renders all 34 tools, checks errors, WebGL canvases and label collisions
 ```
 
 The browser suite needs Playwright and a server running on port 8899; it skips itself if

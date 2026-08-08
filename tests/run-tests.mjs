@@ -25,6 +25,10 @@ import {
   simulateActionPotential, findThreshold, restingGates, HH,
   dnaHelix, B_DNA,
 } from "../assets/js/lib/anatomy-core.js";
+import {
+  BODY, SYSTEMS, STRUCTURES, STRUCTURES_BY_ID, structuresBySystem, modelledMass,
+  vertebrae, ribs, spineCurveOffset, smallIntestinePath, largeIntestinePath,
+} from "../assets/js/lib/body-core.js";
 
 let passed = 0;
 let failed = 0;
@@ -669,6 +673,91 @@ test("DNA pairing and bond counts are correct", () => {
   }
   close(helix.gcContent, 50, 9);
   assert.throws(() => dnaHelix("XYZ"), /sequence/);
+});
+
+/* ------------------------------------------------------- Body anatomy ---- */
+
+test("every structure is well formed and in a known system", () => {
+  assert.ok(STRUCTURES.length >= 15, "expected a substantial structure set");
+  assert.equal(new Set(STRUCTURES.map((s) => s.id)).size, STRUCTURES.length, "ids must be unique");
+  for (const structure of STRUCTURES) {
+    assert.ok(SYSTEMS[structure.system], `${structure.id} has unknown system ${structure.system}`);
+    assert.ok(structure.name && structure.latin, `${structure.id} needs a name and a Latin name`);
+    assert.ok(structure.function.length > 20, `${structure.id} needs a real description`);
+    assert.ok(structure.shape?.type, `${structure.id} needs a shape recipe`);
+  }
+});
+
+test("structures are grouped without loss", () => {
+  const grouped = structuresBySystem();
+  const total = [...grouped.values()].reduce((sum, list) => sum + list.length, 0);
+  assert.equal(total, STRUCTURES.length);
+  assert.ok(modelledMass() > 3 && modelledMass() < 12, `modelled organ mass out of range: ${modelledMass()}`);
+});
+
+test("the spine carries its three curves", () => {
+  // Cervical and lumbar curve forwards (+z), thoracic backwards (−z).
+  assert.ok(spineCurveOffset(142) > 1, "cervical lordosis should curve anteriorly");
+  assert.ok(spineCurveOffset(118) < -1, "thoracic kyphosis should curve posteriorly");
+  assert.ok(spineCurveOffset(90) > 1, "lumbar lordosis should curve anteriorly");
+});
+
+test("vertebrae are numbered and sized by region", () => {
+  const column = vertebrae();
+  assert.equal(column.length, BODY.vertebrae);
+  assert.equal(column.filter((v) => v.region === "lumbar").length, 5);
+  assert.equal(column.filter((v) => v.region === "thoracic").length, 12);
+  assert.equal(column.filter((v) => v.region === "cervical").length, 7);
+  assert.equal(column[0].name, "L5");
+  assert.equal(column.at(-1).name, "C1");
+
+  // Load-bearing lumbar bodies are larger than cervical ones, and the column rises.
+  assert.ok(column[0].radius > column.at(-1).radius * 1.5);
+  for (let i = 1; i < column.length; i += 1) {
+    assert.ok(column[i].position[1] > column[i - 1].position[1], "vertebrae must ascend");
+  }
+});
+
+test("ribs are classified true, false and floating", () => {
+  const cage = ribs();
+  assert.equal(cage.length, BODY.ribPairs);
+  assert.equal(cage.filter((r) => r.type === "true").length, 7);
+  assert.equal(cage.filter((r) => r.type === "false").length, 3);
+  assert.equal(cage.filter((r) => r.type === "floating").length, 2);
+  // Floating ribs do not reach the sternum, so they sweep less far round.
+  assert.ok(cage.at(-1).sweep < cage[0].sweep);
+  // The cage descends from rib 1 downwards.
+  for (let i = 1; i < cage.length; i += 1) {
+    assert.ok(cage[i].position[1] < cage[i - 1].position[1], "ribs must descend");
+  }
+});
+
+test("gut paths are continuous and stay inside the abdomen", () => {
+  const small = smallIntestinePath();
+  assert.ok(small.length > 100, "the coil needs enough points to read as packed");
+  for (const point of small) {
+    assert.ok(point.every(Number.isFinite));
+    assert.ok(Math.hypot(point[0], point[2]) < 14, "small intestine strays outside the abdomen");
+    assert.ok(point[1] > 80 && point[1] < 110, "small intestine outside the abdominal height range");
+  }
+  // Successive points must be close together, or the tube would tear.
+  for (let i = 1; i < small.length; i += 1) {
+    const step = Math.hypot(...small[i].map((v, axis) => v - small[i - 1][axis]));
+    assert.ok(step < 6, `discontinuous jump of ${step} in the small intestine path`);
+  }
+
+  const large = largeIntestinePath();
+  assert.ok(large.length >= 8);
+  // The colon frames the small intestine: it starts low right and ends at the midline.
+  assert.ok(large[0][0] < 0, "the caecum sits on the subject's right");
+  assert.ok(Math.abs(large.at(-1)[0]) < 2, "the rectum should end near the midline");
+});
+
+test("organs are placed on the correct side of the body", () => {
+  // +x is the subject's left. Heart left of midline, liver predominantly right.
+  assert.ok(STRUCTURES_BY_ID.get("heart").shape.position[0] > 0, "the heart sits left of the midline");
+  assert.ok(STRUCTURES_BY_ID.get("spleen").shape.position[0] > 0, "the spleen is a left-sided organ");
+  assert.ok(STRUCTURES_BY_ID.get("gallbladder").shape.position[0] < 0, "the gallbladder is right-sided");
 });
 
 /* ------------------------------------------------------------------ Report */

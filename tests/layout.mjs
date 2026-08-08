@@ -36,7 +36,7 @@ const { chromium } = playwright;
 const ROUTES = {
   physics: ["motion", "projectile", "dynamics", "circuits", "refraction", "lenses", "thermal", "nuclear", "reference"],
   chemistry: ["periodic", "molecules3d", "lattices", "orbitals", "molar", "balance", "stoichiometry", "empirical", "solutions", "gases", "ph", "reference"],
-  biology: ["heart", "airways", "neuron", "helix", "dna", "codons", "punnett", "populations", "cells", "microscopy", "sav", "reference"],
+  biology: ["body", "heart", "airways", "neuron", "helix", "dna", "codons", "punnett", "populations", "cells", "microscopy", "sav", "reference"],
 };
 
 const problems = [];
@@ -62,7 +62,7 @@ for (const [subject, tools] of Object.entries(ROUTES)) {
     if (errors.length) problems.push(`${route}: ${errors.join(" | ")}`);
 
     // 3D tools must actually get a canvas up, not silently fall back.
-    if (["molecules3d", "lattices", "orbitals", "heart", "airways", "neuron", "helix"].includes(toolId)) {
+    if (["molecules3d", "lattices", "orbitals", "body", "heart", "airways", "neuron", "helix"].includes(toolId)) {
       const canvases = await page.$$eval(".stage3d canvas", (nodes) => nodes.length);
       if (canvases !== 1) problems.push(`${route}: expected one WebGL canvas, found ${canvases}`);
     }

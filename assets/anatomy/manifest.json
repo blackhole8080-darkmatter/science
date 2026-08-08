@@ -1,0 +1,5 @@
+{
+  "$comment": "Optional scanned meshes. Empty by design — the explorer generates every structure procedurally. See README.md in this folder before adding anything, especially the licensing section.",
+  "source": null,
+  "structures": {}
+}
