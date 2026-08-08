@@ -5,6 +5,7 @@
 
 import { h, clear, note } from "./lib/ui.js";
 import { disposeAllStages } from "./lib/three-stage.js";
+import { buildIndex, createPalette } from "./lib/command-palette.js";
 import physics from "./modules/physics.js";
 import chemistry from "./modules/chemistry.js";
 import biology from "./modules/biology.js";
@@ -174,6 +175,24 @@ function render() {
   renderRail();
   renderStage();
 }
+
+/* ------------------------------------------------------------- Palette -- */
+
+const palette = createPalette(buildIndex(SUBJECTS), (entry) => {
+  const [subjectId, toolId] = entry.route.split("/");
+  const subject = SUBJECTS.find((s) => s.id === subjectId) || SUBJECTS[0];
+  const tool = subject.tools.find((t) => t.id === toolId) || subject.tools[0];
+  navigate(subject, tool);
+});
+
+const paletteTrigger = h(
+  "button.palette-trigger",
+  { type: "button", onClick: () => palette.open(), "aria-label": "Search the workspace" },
+  "🔍",
+  h("span.palette-trigger-label", {}, "Search"),
+  h("kbd", {}, navigator.platform?.includes("Mac") ? "⌘K" : "Ctrl K")
+);
+themeToggle.before(paletteTrigger);
 
 current = parseHash();
 navigate(current.subject, current.tool, { replace: true });

@@ -19,6 +19,7 @@ import {
   radialNodes, radialProbability,
 } from "../lib/orbital-core.js";
 import { lineChart } from "../lib/chart.js";
+import { sampleOrbitalDensity } from "../lib/wasm-kernels.js";
 
 const ACCENT = "var(--chem)";
 const PHASE_POSITIVE = "#3987e5";
@@ -411,6 +412,9 @@ function orbitalViewer() {
       const object = mode === "shape" ? orbitalSurface(orbital) : orbitalCloud(orbital);
       stage.root.add(object);
       stage.frame(1.18, object);
+      // Swap in the C++ kernel's sampling once it has loaded. It produces
+      // bit-identical points, so this only ever changes how fast they arrived.
+      if (mode === "density") upgradeCloudWithKernel(orbital, object);
       // Axes are added after framing so they do not pull the camera back.
       stage.root.add(...axisLines(mode === "shape" ? 1.5 : orbital.extent * 0.8));
     }
@@ -529,6 +533,28 @@ function orbitalCloud(orbital) {
     geometry,
     new THREE.PointsMaterial({ size: orbital.extent * 0.03, vertexColors: true, transparent: true, opacity: 0.75, sizeAttenuation: true })
   );
+}
+
+/**
+ * Re-sample the cloud with the WebAssembly kernel and swap the positions in.
+ * Silently does nothing when the kernel is unavailable — the JS cloud already
+ * on screen is the same data.
+ */
+async function upgradeCloudWithKernel(orbital, points) {
+  const sampled = await sampleOrbitalDensity(orbital, { count: 14000, seed: 7 });
+  if (!sampled || !points.geometry) return;
+  points.geometry.setAttribute("position", new THREE.Float32BufferAttribute(sampled.points, 3));
+  const colors = new Float32Array(sampled.phases.length * 3);
+  const positive = new THREE.Color(PHASE_POSITIVE);
+  const negative = new THREE.Color(PHASE_NEGATIVE);
+  sampled.phases.forEach((phase, i) => {
+    const color = phase > 0 ? positive : negative;
+    colors[i * 3] = color.r;
+    colors[i * 3 + 1] = color.g;
+    colors[i * 3 + 2] = color.b;
+  });
+  points.geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+  points.geometry.attributes.position.needsUpdate = true;
 }
 
 function axisLines(extent) {

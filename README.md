@@ -126,6 +126,44 @@ first** — it lists the open atlases (BodyParts3D, Z-Anatomy, OpenAnatomy) with
 licences, and explains two traps: CC BY-SA share-alike is viral, and a model with no
 stated licence is not free to use, however public it looks.
 
+## Engineering
+
+Three things beyond the browser code, each earning its place rather than being
+there for the badge:
+
+**A C++ compute kernel.** `wasm/orbital.cpp` compiles freestanding for wasm32 with
+clang — no Emscripten, no libc, 2 KB of output — and takes over the heaviest loop
+in the app, rejection-sampling |ψ|² for the orbital clouds. It imports its
+transcendental functions *from the host's Math object* rather than linking a libm,
+which means the kernel and the JavaScript reference produce **bit-identical**
+results. That equivalence is asserted in the tests, so the fast path can never
+silently drift from the readable one. Measured speedup is a modest 1.36×; the real
+win is a swappable, verifiable fast path. Loading fails soft: no WebAssembly, no
+binary, or a blocked fetch all fall back to JavaScript and change nothing but the
+timing.
+
+```bash
+npm run build:wasm     # only needed when the C++ changes; the .wasm is committed
+```
+
+**A Python cross-validation harness.** `tools/validate/reference.py` reimplements
+the chemistry, physics and biology independently — different language, written from
+the science, standard library only, no numpy — and `check.py` diffs it against the
+JavaScript engines. This catches what same-language unit tests structurally cannot:
+a misremembered constant or a transcription slip would have to occur *identically*
+in two independent implementations to survive. Currently 22 checks, all agreeing,
+including exact-rational equation balancing, Hodgkin–Huxley integration and
+hydrogenic radial normalisation.
+
+```bash
+npm run test:cross
+```
+
+**A command palette.** ⌘K (or `/`) searches every tool, all 118 elements, the
+constants, the formula sheets, molecules, crystals, orbitals and anatomical
+structures in one box — so finding "iron" or "Planck constant" or "aorta" does not
+require knowing which subject owns it.
+
 ## Design notes
 
 - **Colour is never the only cue.** The element category palette was solved for maximum
@@ -133,6 +171,11 @@ stated licence is not free to use, however public it looks.
   (worst adjacent pair ΔE 13.2 CVD / 19.3 normal vision, in both light and dark themes).
   Every cell still carries its symbol and number, the legend repeats the category in
   text, and a sortable text table holds the same data.
+- **Glass surfaces, with legibility non-negotiable.** Panels are frosted — blurred,
+  saturated backdrops with a lit top edge — but the translucency is kept low enough
+  that text contrast never depends on what happens to sit behind a panel. Where a
+  browser cannot blur, the fallback is an opaque panel rather than an unreadable
+  transparent one.
 - **Both themes are deliberate.** The light theme is its own set of surface values, not
   an inverted dark theme; the toggle is remembered in `localStorage`.
 - **Every view is linkable.** The URL hash is `#subject/tool`, so any tool can be
@@ -156,6 +199,8 @@ assets/
     lib/biology-core.js     central dogma, Mendelian and population genetics
     lib/anatomy-core.js     Weibel airways, cardiac cycle, Hodgkin-Huxley, B-DNA
     lib/body-core.js        whole-body structures, systems, spine and rib geometry
+    lib/wasm-kernels.js     WebAssembly kernel loading, with JavaScript fallback
+    lib/command-palette.js  the cross-workspace search index
     lib/chart.js            inline-SVG plotting with a crosshair readout
     lib/ui.js               DOM helpers, number formatting, tool scaffold
     modules/{physics,chemistry,biology}.js
@@ -163,7 +208,11 @@ assets/
     modules/bio3d.js        beating heart, airway tree, action potential, helix
     modules/body3d.js       whole-body explorer with system layers and picking
 assets/anatomy/             optional scanned meshes (empty; see its README)
-vendor/three/               three.js r185 + OrbitControls (vendored, offline)
+wasm/orbital.cpp            C++ compute kernel (freestanding wasm32)
+assets/wasm/orbital.wasm    the compiled kernel, committed
+tools/build-wasm.sh         clang build script
+tools/validate/             Python reference implementation + cross-check runner
+vendor/three/               three.js r185 + OrbitControls + GLTFLoader (vendored)
 tests/
   run-tests.mjs             engine tests (no dependencies)
   layout.mjs                browser checks (needs Playwright)
@@ -176,6 +225,7 @@ reused elsewhere.
 
 ```bash
 npm test              # 70 engine tests, no dependencies
+npm run test:cross    # 22 JavaScript-vs-Python cross-language checks
 npm run test:browser  # renders all 34 tools, checks errors, WebGL canvases and label collisions
 ```
 
